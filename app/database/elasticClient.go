@@ -1,0 +1,54 @@
+package database
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+
+	"github.com/elastic/go-elasticsearch"
+)
+
+//elasticClient elastic client used for elastic search access
+var elasticClient *elasticsearch.Client
+var indexName = "questions"
+
+//InitElastic function initialises the
+func InitElastic() {
+	elasticClient, _ = elasticsearch.NewDefaultClient()
+	fmt.Println(elasticsearch.Version)
+}
+
+//SearchQuestions is used to search for questions
+func SearchQuestions(searchQuery map[string]interface{}) (map[string]interface{}, error) {
+	if elasticClient == nil {
+		return nil, errors.New("empty elastic client")
+	}
+
+	var buf bytes.Buffer
+	var result map[string]interface{}
+
+	if err := json.NewEncoder(&buf).Encode(searchQuery); err != nil {
+		return nil, err
+	}
+
+	res, err := elasticClient.Search(
+		elasticClient.Search.WithContext(context.Background()),
+		elasticClient.Search.WithIndex(indexName),
+		elasticClient.Search.WithBody(&buf),
+		elasticClient.Search.WithTrackTotalHits(true),
+		elasticClient.Search.WithPretty(),
+	)
+	defer res.Body.Close()
+
+	if err != nil || res.IsError() {
+		return nil, err
+	}
+
+	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	return result["hits"].(map[string]interface{}), nil
+}
