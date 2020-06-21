@@ -71,7 +71,7 @@ func CreateGame(maxQuestions int, language Language, numberOfPlayers int, topic 
 			Status:           Active,
 			CreatedTimestamp: time.Now().Unix(),
 			Questions:        questions,
-			Scores:           nil,
+			Scores:           make(map[string][]int),
 		}
 		dataStr, err := json.Marshal(data)
 		if err != nil {
@@ -82,7 +82,7 @@ func CreateGame(maxQuestions int, language Language, numberOfPlayers int, topic 
 		if err == nil {
 			_, err := database.RedisClient.Set(LastGameIDKey, gameID, 0).Result()
 			if err == nil {
-				return string(gameID), nil
+				return strconv.Itoa(gameID), nil
 			}
 		}
 	}

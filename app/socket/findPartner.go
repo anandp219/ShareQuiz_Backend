@@ -38,9 +38,12 @@ func handleClient(conn net.Conn) {
 	} else {
 		socketsForTopic := WaitingSockets[key]
 		secondConn := socketsForTopic[0]
+		// _, err := strconv.Atoi(language)
+		// _, err = strconv.Atoi(topicID)
 		languageEnum, err := strconv.Atoi(language)
 		topicEnum, err := strconv.Atoi(topicID)
 		gameID, err := app.CreateGame(app.NumOfQuestionsInGame, app.Language(languageEnum), 2, app.Topic(topicEnum))
+		// gameID := "1"
 		if err != nil {
 			panic("Socket Error")
 		}

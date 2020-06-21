@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/go-redis/redis"
-
 	gosocketio "github.com/graarh/golang-socketio"
 	"github.com/graarh/golang-socketio/transport"
 )
@@ -34,15 +33,19 @@ func InitGameSocket() {
 		go disconnectPlayer(c)
 	})
 
-	server.On("/join", func(c *gosocketio.Channel, room Room) {
+	server.On("message", func(c *gosocketio.Channel, room Room) {
+		log.Println("message")
+	})
+
+	server.On("join", func(c *gosocketio.Channel, room Room) {
 		go playerJoin(c, room)
 	})
 
-	server.On("/answer", func(c *gosocketio.Channel, gameString string) {
+	server.On("answer", func(c *gosocketio.Channel, gameString string) {
 		go answerQuestion(c, gameString)
 	})
 
-	server.On("/time_out", func(c *gosocketio.Channel, gameString string) {
+	server.On("time_out", func(c *gosocketio.Channel, gameString string) {
 		go handleTimeout(c, gameString)
 	})
 
@@ -74,7 +77,7 @@ func disconnectPlayer(c *gosocketio.Channel) {
 		panic(errorMessage)
 	}
 	delete(clientToRoomMap, c.Id())
-	server.BroadcastTo(room, "/disconnect", string(gameJSON))
+	server.BroadcastTo(room, "disconnect", string(gameJSON))
 }
 
 func playerJoin(c *gosocketio.Channel, room Room) {
@@ -108,7 +111,7 @@ func playerJoin(c *gosocketio.Channel, room Room) {
 	if err != nil {
 		panic(errorMessage)
 	}
-	if len(game.Players) == 2 {
+	if len(game.Players) >= 2 {
 		go sendQuestion(roomString, 1)
 	}
 }
@@ -151,11 +154,11 @@ func answerQuestion(c *gosocketio.Channel, gameString string) {
 }
 
 func sendNewQuestion(totalAnswered int, game *app.Game, errorMessage string) {
-	event := "/new_answer"
+	event := "new_answer"
 	if totalAnswered == game.NumberOfPlayers {
 		if game.QuestionNumber == game.MaxQuestions {
 			game.Status = app.Finished
-			event = "/game_over"
+			event = "game_over"
 		} else {
 			game.QuestionNumber++
 		}
@@ -169,7 +172,7 @@ func sendNewQuestion(totalAnswered int, game *app.Game, errorMessage string) {
 		panic(errorMessage)
 	}
 	server.BroadcastTo(game.ID, event, string(gameJSON))
-	if event == "/new_answer" && totalAnswered == game.NumberOfPlayers {
+	if event == "new_answer" && totalAnswered == game.NumberOfPlayers {
 		go sendQuestion(game.ID, game.QuestionNumber)
 	}
 }
@@ -192,7 +195,7 @@ func sendQuestion(room string, questionNumber int) {
 	if err != nil {
 		panic(errorMessage)
 	}
-	server.BroadcastTo(room, "/new_question", string(gameJSON))
+	server.BroadcastTo(room, "new_question", string(gameJSON))
 }
 
 func handleError(c *gosocketio.Channel) {
