@@ -9,8 +9,7 @@ import (
 	"time"
 
 	"github.com/go-redis/redis"
-	gosocketio "github.com/graarh/golang-socketio"
-	"github.com/graarh/golang-socketio/transport"
+	socketio "github.com/googollee/go-socket.io"
 )
 
 //Room to joined by the clients
@@ -19,47 +18,62 @@ type Room struct {
 	PhoneNumber string `json:"phoneNumber"`
 }
 
-var server *gosocketio.Server
+var server *socketio.Server
 var clientToRoomMap = make(map[string]string)
+var roomToClientID = make(map[string][]string)
+var err error
 
 // InitGameSocket is used to initialise the socket.
 func InitGameSocket() {
-	server = gosocketio.NewServer(transport.GetDefaultWebsocketTransport())
-	server.On(gosocketio.OnConnection, func(c *gosocketio.Channel) {
+	server, err = socketio.NewServer(nil)
+	if err != nil {
+		panic(err)
+	}
+	server.OnConnect("/", func(s socketio.Conn) error {
 		log.Println("Connected")
+		return nil
 	})
 
-	server.On(gosocketio.OnDisconnection, func(c *gosocketio.Channel) {
-		go disconnectPlayer(c)
+	server.OnDisconnect("/", func(s socketio.Conn, reason string) {
+		go disconnectPlayer(s)
 	})
 
-	server.On("message", func(c *gosocketio.Channel, room Room) {
+	server.OnEvent("/", "message", func(c socketio.Conn, room Room) {
 		log.Println("message")
 	})
 
-	server.On("join", func(c *gosocketio.Channel, room Room) {
+	server.OnEvent("/", "join", func(c socketio.Conn, room Room) {
 		go playerJoin(c, room)
 	})
 
-	server.On("answer", func(c *gosocketio.Channel, gameString string) {
+	server.OnEvent("/", "answer", func(c socketio.Conn, gameString string) {
 		go answerQuestion(c, gameString)
 	})
 
-	server.On("time_out", func(c *gosocketio.Channel, gameString string) {
+	server.OnEvent("/", "time_out", func(c socketio.Conn, gameString string) {
 		go handleTimeout(c, gameString)
 	})
 
-	serveMux := http.NewServeMux()
-	serveMux.Handle("/socket.io/", server)
+	go server.Serve()
+	defer server.Close()
 
-	log.Println("Starting server...")
-	log.Panic(http.ListenAndServe(":8082", serveMux))
+	http.Handle("/socket.io/", server)
+	log.Println("Serving at localhost:8082...")
+	log.Fatal(http.ListenAndServe(":8082", nil))
 }
 
-func disconnectPlayer(c *gosocketio.Channel) {
+func disconnectPlayer(c socketio.Conn) {
 	errorMessage := "Error while disconnecting player"
-	defer handleError(c)
-	room := clientToRoomMap[c.Id()]
+	defer handleDisconnectError(c)
+	room, ok := clientToRoomMap[c.ID()]
+	if !ok {
+		return
+	}
+	clientIDsForRoom := roomToClientID[room]
+	for _, clientID := range clientIDsForRoom {
+		delete(clientToRoomMap, clientID)
+	}
+	delete(roomToClientID, room)
 	gameData, err := database.RedisClient.Get(room).Result()
 	if err != nil || err == redis.Nil {
 		log.Println(err)
@@ -76,16 +90,20 @@ func disconnectPlayer(c *gosocketio.Channel) {
 	if err != nil {
 		panic(errorMessage)
 	}
-	delete(clientToRoomMap, c.Id())
-	server.BroadcastTo(room, "disconnect", string(gameJSON))
+	server.BroadcastToRoom("/", room, "disconnect", string(gameJSON))
 }
 
-func playerJoin(c *gosocketio.Channel, room Room) {
+func playerJoin(c socketio.Conn, room Room) {
 	errorMessage := "error while getting game for the gameId"
 	defer handleError(c)
 	roomString := string(room.Room)
 	c.Join(roomString)
-	clientToRoomMap[c.Id()] = roomString
+	clientToRoomMap[c.ID()] = roomString
+	clientIds, ok := roomToClientID[roomString]
+	if !ok {
+		clientIds = make([]string, 0)
+	}
+	roomToClientID[roomString] = append(clientIds, c.ID())
 	gameData, err := database.RedisClient.Get(roomString).Result()
 	if err != nil || err == redis.Nil {
 		log.Println(err)
@@ -111,12 +129,12 @@ func playerJoin(c *gosocketio.Channel, room Room) {
 	if err != nil {
 		panic(errorMessage)
 	}
-	if len(game.Players) >= 2 {
+	if len(game.Players) == 2 {
 		go sendQuestion(roomString, 1)
 	}
 }
 
-func handleTimeout(c *gosocketio.Channel, gameString string) {
+func handleTimeout(c socketio.Conn, gameString string) {
 	errorMessage := "error while handling the timeout event"
 	game := &app.Game{}
 	err := json.Unmarshal([]byte(gameString), game)
@@ -132,7 +150,7 @@ func handleTimeout(c *gosocketio.Channel, gameString string) {
 	sendNewQuestion(totalAnswered, game, errorMessage)
 }
 
-func answerQuestion(c *gosocketio.Channel, gameString string) {
+func answerQuestion(c socketio.Conn, gameString string) {
 	errorMessage := "error while answering the question"
 	game := &app.Game{}
 	err := json.Unmarshal([]byte(gameString), game)
@@ -142,12 +160,7 @@ func answerQuestion(c *gosocketio.Channel, gameString string) {
 	questionNumber := game.QuestionNumber
 	question := game.Questions[questionNumber]
 	totalAnswered := 0
-	for key, value := range question.PlayerAnswers {
-		if value == question.Answer {
-			game.Scores[key][game.QuestionNumber] = 10
-		} else {
-			game.Scores[key][game.QuestionNumber] = 0
-		}
+	for range question.PlayerAnswers {
 		totalAnswered++
 	}
 	sendNewQuestion(totalAnswered, game, errorMessage)
@@ -171,14 +184,14 @@ func sendNewQuestion(totalAnswered int, game *app.Game, errorMessage string) {
 	if err != nil {
 		panic(errorMessage)
 	}
-	server.BroadcastTo(game.ID, event, string(gameJSON))
+	server.BroadcastToRoom("/", game.ID, event, string(gameJSON))
 	if event == "new_answer" && totalAnswered == game.NumberOfPlayers {
 		go sendQuestion(game.ID, game.QuestionNumber)
 	}
 }
 
 func sendQuestion(room string, questionNumber int) {
-	time.Sleep(2 * time.Second)
+	time.Sleep(5 * time.Second)
 	errorMessage := "error while sending question to the users"
 	gameData, err := database.RedisClient.Get(room).Result()
 	if err != nil {
@@ -195,13 +208,27 @@ func sendQuestion(room string, questionNumber int) {
 	if err != nil {
 		panic(errorMessage)
 	}
-	server.BroadcastTo(room, "new_question", string(gameJSON))
+	server.BroadcastToRoom("/", room, "new_question", string(gameJSON))
 }
 
-func handleError(c *gosocketio.Channel) {
+func handleError(c socketio.Conn) {
 	if r := recover(); r != nil {
 		log.Println(r)
 		log.Println("error while joining room for the sockets")
 		c.Close()
+	}
+}
+
+func handlePlayerJoinError(c socketio.Conn) {
+	if r := recover(); r != nil {
+		log.Println(r)
+		c.Close()
+	}
+}
+
+func handleDisconnectError(c socketio.Conn) {
+	if r := recover(); r != nil {
+		log.Println(r)
+		log.Println("error while removing the socket from the room")
 	}
 }

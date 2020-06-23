@@ -22,12 +22,12 @@ type Question struct {
 // Game object status 1 is active, 2 is Disconnected and 3 is Finished
 type Game struct {
 	ID               string            `json:"id"`
-	Language         Language          `json:"language"`
+	Language         Language          `json:"language,string"`
 	MaxQuestions     int               `json:"maxQuestions"`
 	NumberOfPlayers  int               `json:"numberOfPlayers"`
 	QuestionNumber   int               `json:"questionNumber"`
 	Players          map[string]Player `json:"players"`
-	Status           Status            `json:"status"`
+	Status           Status            `json:"status,string"`
 	CreatedTimestamp int64             `json:"createdTimestamp"`
 	Questions        []Question        `json:"questions"`
 	Scores           map[string][]int  `json:"scores"`
@@ -112,7 +112,7 @@ func GetGameQuestions(topic Topic, language Language, numOfQuestions int) ([]Que
 	filterQuery := []map[string]interface{}{topicsQuery, languageQuery}
 
 	query := map[string]interface{}{
-		"size": numOfQuestions,
+		"size": numOfQuestions + 1,
 		"query": map[string]interface{}{
 			"bool": map[string]interface{}{
 				"filter": filterQuery,
@@ -126,7 +126,7 @@ func GetGameQuestions(topic Topic, language Language, numOfQuestions int) ([]Que
 	}
 
 	result, err := database.SearchQuestions(query)
-	questions := make([]Question, numOfQuestions)
+	questions := make([]Question, numOfQuestions + 1)
 	hits := result["hits"].([]interface{})
 	for i, hit := range hits {
 		questionObject := hit.(map[string]interface{})["_source"].(map[string]interface{})
