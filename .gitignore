@@ -20,3 +20,5 @@ sharequiz
 .DS_Store
 *.idea
 *.vscode
+*.gcloudignore
+*.sum
