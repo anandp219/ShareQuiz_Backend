@@ -1,4 +1,4 @@
-runtime: go1.14
+runtime: go114
 manual_scaling:
   instances: 1
 network:
