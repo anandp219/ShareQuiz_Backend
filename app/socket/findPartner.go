@@ -1,83 +1,126 @@
 package socket
 
 import (
-	"encoding/json"
-	"fmt"
-	"net"
-	"os"
+	"log"
+	"net/http"
 	"sharequiz/app"
-	"strconv"
+	"sync"
+
+	socketio "github.com/googollee/go-socket.io"
 )
 
-// WaitingSockets variable is used for connection.
-var WaitingSockets map[string][]net.Conn
+var playerJoinServer *socketio.Server
 
-// Init is used to initialise the socket.
-func Init() {
-	service := ":8081"
-	WaitingSockets = make(map[string][]net.Conn)
-	tcpAddr, err := net.ResolveTCPAddr("tcp4", service)
-	checkError(err)
-	listener, err := net.ListenTCP("tcp", tcpAddr)
-	checkError(err)
-	for {
-		conn, err := listener.Accept()
-		if err != nil {
-			continue
-		}
-		go handleClient(conn)
-	}
+// GameData Initial game data of the game
+type GameData struct {
+	Topic    app.Topic    `json:"topic,string"`
+	Language app.Language `json:"language,string"`
 }
 
-func handleClient(conn net.Conn) {
-	defer closeSocket(conn)
-	topicID, language := getClientData(conn)
-	key := topicID + "_" + language
+// WaitingSockets variable is used for connection.
+var WaitingSockets = make(map[string][]socketio.Conn)
+
+// SocketToTopicMap is a map from the socket id to the game topic
+var SocketToTopicMap = make(map[string]string)
+
+// RoomToLock Room locks for synchronization of go routines for a room.
+var RoomToLock = make(map[string]*sync.Mutex)
+
+// TopicToLock Topic locks for synchronization of go routines for a topic.
+var TopicToLock = make(map[string]*sync.Mutex)
+
+// InitPlayerJoinSocket is used to initialise the socket.
+func InitPlayerJoinSocket() {
+	playerJoinServer, err = socketio.NewServer(nil)
+	if err != nil {
+		panic(err)
+	}
+	playerJoinServer.OnConnect("/", func(s socketio.Conn) error {
+		log.Println("Connected")
+		return nil
+	})
+
+	playerJoinServer.OnEvent("/", "join", func(c socketio.Conn, gameData GameData) {
+		go connectJoin(c, gameData)
+	})
+
+	playerJoinServer.OnDisconnect("/", func(s socketio.Conn, reason string) {
+		go disconnectJoin(s)
+	})
+
+	go playerJoinServer.Serve()
+	defer playerJoinServer.Close()
+
+	http.Handle("/socket.io/join_game/", playerJoinServer)
+	log.Println("Serving at localhost:8081...")
+	log.Fatal(http.ListenAndServe(":8081", nil))
+}
+
+func connectJoin(conn socketio.Conn, gameData GameData) {
+	key := gameData.Topic.String() + "_" + gameData.Language.String()
+	lockTopic(key)
+	SocketToTopicMap[conn.ID()] = key
+	defer handleConnectJoinError(conn, key)
 	if len(WaitingSockets[key]) == 0 {
 		WaitingSockets[key] = append(WaitingSockets[key], conn)
 	} else {
 		socketsForTopic := WaitingSockets[key]
 		secondConn := socketsForTopic[0]
-		// _, err := strconv.Atoi(language)
-		// _, err = strconv.Atoi(topicID)
-		languageEnum, err := strconv.Atoi(language)
-		topicEnum, err := strconv.Atoi(topicID)
-		gameID, err := app.CreateGame(app.NumOfQuestionsInGame, app.Language(languageEnum), 2, app.Topic(topicEnum))
-		// gameID := "1"
+		gameID, err := app.CreateGame(app.NumOfQuestionsInGame, gameData.Language, 2, gameData.Topic)
 		if err != nil {
 			panic("Socket Error")
 		}
+		RoomToLock[gameID] = &sync.Mutex{}
+		conn.Emit("game", gameID)
+		secondConn.Emit("game", gameID)
 		WaitingSockets[key] = socketsForTopic[1:]
-		_, err = conn.Write([]byte(gameID))
-		_, err = secondConn.Write([]byte(gameID))
-		conn.Close()
-		secondConn.Close()
 	}
+	unlockTopic(key)
 }
 
-func getClientData(conn net.Conn) (string, string) {
-	buffer := make([]byte, 0, 4096)
-	tmp := make([]byte, 256)
-	n, err := conn.Read(tmp)
-	buffer = append(buffer, tmp[:n]...)
-	m := make(map[string]string)
-	err = json.Unmarshal(buffer, &m)
-	if err != nil {
-		panic("socket error")
+func disconnectJoin(conn socketio.Conn) {
+	key, ok := SocketToTopicMap[conn.ID()]
+	if !ok {
+		return
 	}
-	return m["topicId"], m["language"]
+	lockTopic(key)
+	defer handleDisconnectJoinError(conn, key)
+	delete(SocketToTopicMap, conn.ID())
+	socketsForTopic, ok := WaitingSockets[key]
+	if ok {
+		for i, value := range socketsForTopic {
+			if value.ID() == conn.ID() {
+				WaitingSockets[key] = append(socketsForTopic[:i], socketsForTopic[i+1:]...)
+			}
+		}
+	}
+	unlockTopic(key)
 }
 
-func closeSocket(conn net.Conn) {
+func handleConnectJoinError(conn socketio.Conn, key string) {
 	if r := recover(); r != nil {
-		_, _ = conn.Write([]byte("-1"))
+		unlockTopic(key)
 		conn.Close()
 	}
 }
 
-func checkError(err error) {
-	if err != nil {
-		fmt.Printf("Fatal error: %s", err.Error())
-		os.Exit(1)
+func handleDisconnectJoinError(conn socketio.Conn, key string) {
+	if r := recover(); r != nil {
+		unlockTopic(key)
+	}
+}
+
+func lockTopic(key string) {
+	if mutex, ok := TopicToLock[key]; ok {
+		mutex.Lock()
+	} else {
+		TopicToLock[key] = &sync.Mutex{}
+		TopicToLock[key].Lock()
+	}
+}
+
+func unlockTopic(key string) {
+	if mutex, ok := TopicToLock[key]; ok {
+		mutex.Unlock()
 	}
 }

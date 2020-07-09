@@ -42,7 +42,6 @@ type Player struct {
 
 // CreateGame function
 func CreateGame(maxQuestions int, language Language, numberOfPlayers int, topic Topic) (string, error) {
-	time.Now()
 	// 3 tries to create game
 	for i := 1; i <= 3; i++ {
 		gameID := 0
@@ -126,7 +125,7 @@ func GetGameQuestions(topic Topic, language Language, numOfQuestions int) ([]Que
 	}
 
 	result, err := database.SearchQuestions(query)
-	questions := make([]Question, numOfQuestions + 1)
+	questions := make([]Question, numOfQuestions+1)
 	hits := result["hits"].([]interface{})
 	for i, hit := range hits {
 		questionObject := hit.(map[string]interface{})["_source"].(map[string]interface{})

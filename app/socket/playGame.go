@@ -2,6 +2,7 @@ package socket
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"sharequiz/app"
@@ -38,20 +39,12 @@ func InitGameSocket() {
 		go disconnectPlayer(s)
 	})
 
-	server.OnEvent("/", "message", func(c socketio.Conn, room Room) {
-		log.Println("message")
-	})
-
 	server.OnEvent("/", "join", func(c socketio.Conn, room Room) {
 		go playerJoin(c, room)
 	})
 
 	server.OnEvent("/", "answer", func(c socketio.Conn, gameString string) {
 		go answerQuestion(c, gameString)
-	})
-
-	server.OnEvent("/", "time_out", func(c socketio.Conn, gameString string) {
-		go handleTimeout(c, gameString)
 	})
 
 	go server.Serve()
@@ -64,11 +57,12 @@ func InitGameSocket() {
 
 func disconnectPlayer(c socketio.Conn) {
 	errorMessage := "Error while disconnecting player"
-	defer handleDisconnectError(c)
 	room, ok := clientToRoomMap[c.ID()]
 	if !ok {
 		return
 	}
+	lockRoom(room)
+	defer handleDisconnectError(c, room)
 	clientIDsForRoom := roomToClientID[room]
 	for _, clientID := range clientIDsForRoom {
 		delete(clientToRoomMap, clientID)
@@ -81,22 +75,26 @@ func disconnectPlayer(c socketio.Conn) {
 	}
 	game := &app.Game{}
 	err = json.Unmarshal([]byte(gameData), game)
-	if err != nil {
-		panic(errorMessage)
+	if game.Status != app.Finished {
+		if err != nil {
+			panic(errorMessage)
+		}
+		game.Status = app.Disconnected
+		gameJSON, err := json.Marshal(game)
+		_, err = database.RedisClient.Set(room, string(gameJSON), 0).Result()
+		if err != nil {
+			panic(errorMessage)
+		}
+		server.BroadcastToRoom("/", room, "disconnect", string(gameJSON))
 	}
-	game.Status = app.Disconnected
-	gameJSON, err := json.Marshal(game)
-	_, err = database.RedisClient.Set(room, string(gameJSON), 0).Result()
-	if err != nil {
-		panic(errorMessage)
-	}
-	server.BroadcastToRoom("/", room, "disconnect", string(gameJSON))
+	unlockRoom(room)
 }
 
 func playerJoin(c socketio.Conn, room Room) {
-	errorMessage := "error while getting game for the gameId"
-	defer handleError(c)
+	errorMessage := "error while joining player for the game"
 	roomString := string(room.Room)
+	lockRoom(roomString)
+	defer handlePlayerJoinError(c, roomString)
 	c.Join(roomString)
 	clientToRoomMap[c.ID()] = roomString
 	clientIds, ok := roomToClientID[roomString]
@@ -129,54 +127,35 @@ func playerJoin(c socketio.Conn, room Room) {
 	if err != nil {
 		panic(errorMessage)
 	}
+	unlockRoom(roomString)
 	if len(game.Players) == 2 {
-		go sendQuestion(roomString, 1)
+		go sendNewQuestion(game, true, c)
 	}
 }
 
-func handleTimeout(c socketio.Conn, gameString string) {
+func answerQuestion(c socketio.Conn, gameString string) {
 	errorMessage := "error while handling the timeout event"
 	game := &app.Game{}
 	err := json.Unmarshal([]byte(gameString), game)
 	if err != nil {
 		panic(errorMessage)
 	}
-	questionNumber := game.QuestionNumber
-	question := game.Questions[questionNumber]
-	totalAnswered := 0
-	for range question.PlayerAnswers {
-		totalAnswered++
+	lockRoom(game.ID)
+	defer handleAnswerQuestionError(c, game.ID)
+	gameData, err := database.RedisClient.Get(game.ID).Result()
+	if err != nil || err == redis.Nil {
+		panic(errorMessage)
 	}
-	sendNewQuestion(totalAnswered, game, errorMessage)
-}
-
-func answerQuestion(c socketio.Conn, gameString string) {
-	errorMessage := "error while answering the question"
-	game := &app.Game{}
-	err := json.Unmarshal([]byte(gameString), game)
+	oldGame := &app.Game{}
+	err = json.Unmarshal([]byte(gameData), oldGame)
 	if err != nil {
 		panic(errorMessage)
 	}
-	questionNumber := game.QuestionNumber
-	question := game.Questions[questionNumber]
-	totalAnswered := 0
-	for range question.PlayerAnswers {
-		totalAnswered++
+	for key, value := range game.Questions[game.QuestionNumber].PlayerAnswers {
+		oldGame.Questions[oldGame.QuestionNumber].PlayerAnswers[key] = value
+		oldGame.Scores[key] = game.Scores[key]
 	}
-	sendNewQuestion(totalAnswered, game, errorMessage)
-}
-
-func sendNewQuestion(totalAnswered int, game *app.Game, errorMessage string) {
-	event := "new_answer"
-	if totalAnswered == game.NumberOfPlayers {
-		if game.QuestionNumber == game.MaxQuestions {
-			game.Status = app.Finished
-			event = "game_over"
-		} else {
-			game.QuestionNumber++
-		}
-	}
-	gameJSON, err := json.Marshal(game)
+	gameJSON, err := json.Marshal(oldGame)
 	if err != nil {
 		panic(errorMessage)
 	}
@@ -184,51 +163,88 @@ func sendNewQuestion(totalAnswered int, game *app.Game, errorMessage string) {
 	if err != nil {
 		panic(errorMessage)
 	}
-	server.BroadcastToRoom("/", game.ID, event, string(gameJSON))
-	if event == "new_answer" && totalAnswered == game.NumberOfPlayers {
-		go sendQuestion(game.ID, game.QuestionNumber)
+	server.BroadcastToRoom("/", game.ID, "new_answer", string(gameJSON))
+	sendNewQuestion(oldGame, false, c)
+}
+
+func sendNewQuestion(game *app.Game, shouldLockRoom bool, c socketio.Conn) {
+	if shouldLockRoom {
+		lockRoom(game.ID)
+		defer handleSendNewQuestionError(c, game.ID)
+	}
+	errorMessage := "error while sending a new question for game "
+	fmt.Println("send new question:", game.QuestionNumber, (game.Questions[game.QuestionNumber].PlayerAnswers))
+	event := "new_question"
+	questionNumber := game.QuestionNumber
+	question := game.Questions[questionNumber]
+	totalAnswered := 0
+	for range question.PlayerAnswers {
+		totalAnswered++
+	}
+	if totalAnswered == game.NumberOfPlayers || questionNumber == 0 {
+		if game.QuestionNumber == game.MaxQuestions {
+			game.Status = app.Finished
+			event = "game_over"
+		} else {
+			game.QuestionNumber++
+			time.Sleep(5 * time.Second)
+		}
+		gameJSON, err := json.Marshal(game)
+		if err != nil {
+			panic(errorMessage)
+		}
+		_, err = database.RedisClient.Set(game.ID, string(gameJSON), 0).Result()
+		if err != nil {
+			panic(errorMessage)
+		}
+		fmt.Println("Sending new question" + game.ID)
+		server.BroadcastToRoom("/", game.ID, event, string(gameJSON))
+	}
+	unlockRoom(game.ID)
+	if event == "game_over" {
+		deleteLockRoom(game.ID)
 	}
 }
 
-func sendQuestion(room string, questionNumber int) {
-	time.Sleep(5 * time.Second)
-	errorMessage := "error while sending question to the users"
-	gameData, err := database.RedisClient.Get(room).Result()
-	if err != nil {
-		panic(errorMessage)
-	}
-	game := &app.Game{}
-	err = json.Unmarshal([]byte(gameData), game)
-	if err != nil {
-		panic(errorMessage)
-	}
-	game.QuestionNumber = questionNumber
-	gameJSON, err := json.Marshal(game)
-	_, err = database.RedisClient.Set(room, string(gameJSON), 0).Result()
-	if err != nil {
-		panic(errorMessage)
-	}
-	server.BroadcastToRoom("/", room, "new_question", string(gameJSON))
-}
-
-func handleError(c socketio.Conn) {
+func handleSendNewQuestionError(c socketio.Conn, room string) {
 	if r := recover(); r != nil {
-		log.Println(r)
-		log.Println("error while joining room for the sockets")
+		unlockRoom(room)
 		c.Close()
 	}
 }
 
-func handlePlayerJoinError(c socketio.Conn) {
+func handleAnswerQuestionError(c socketio.Conn, room string) {
 	if r := recover(); r != nil {
-		log.Println(r)
+		unlockRoom(room)
 		c.Close()
 	}
 }
 
-func handleDisconnectError(c socketio.Conn) {
+func handlePlayerJoinError(c socketio.Conn, room string) {
 	if r := recover(); r != nil {
-		log.Println(r)
-		log.Println("error while removing the socket from the room")
+		unlockRoom(room)
+		c.Close()
 	}
+}
+
+func handleDisconnectError(c socketio.Conn, room string) {
+	if r := recover(); r != nil {
+		unlockRoom(room)
+	}
+}
+
+func lockRoom(roomID string) {
+	if mutex, ok := RoomToLock[roomID]; ok {
+		mutex.Lock()
+	}
+}
+
+func unlockRoom(roomID string) {
+	if mutex, ok := RoomToLock[roomID]; ok {
+		mutex.Unlock()
+	}
+}
+
+func deleteLockRoom(roomID string) {
+	delete(RoomToLock, roomID)
 }
