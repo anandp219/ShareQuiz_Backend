@@ -32,7 +32,7 @@ func main() {
 	database.InitElastic()
 	go socket.InitPlayerJoinSocket()
 	go socket.InitGameSocket()
-	err := router.Run(os.Getenv("HTTP_PORT"))
+	err := router.Run(os.Getenv("PORT"))
 	if err != nil {
 		fmt.Println("Error while starting server")
 	}

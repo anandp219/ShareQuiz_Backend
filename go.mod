@@ -1,4 +1,4 @@
-go go1.14
+go 1.14
 
 module sharequiz
 
