@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/elastic/go-elasticsearch"
+	"github.com/elastic/go-elasticsearch/v8"
 )
 
 //elasticClient elastic client used for elastic search access
