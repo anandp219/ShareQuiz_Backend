@@ -1,6 +1,6 @@
-module sharequiz
+go go1.14
 
-go 1.14
+module sharequiz
 
 require (
 	github.com/elastic/go-elasticsearch/v8 v8.0.0-20200630125629-8413c97f3011
