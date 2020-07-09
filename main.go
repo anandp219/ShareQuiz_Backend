@@ -34,7 +34,7 @@ func main() {
 	go socket.InitGameSocket()
 	err := router.Run(os.Getenv("PORT"))
 	if err != nil {
-		fmt.Println("Error while starting server")
+		fmt.Println(err)
 	}
 }
 
