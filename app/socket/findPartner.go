@@ -3,6 +3,7 @@ package socket
 import (
 	"log"
 	"net/http"
+	"os"
 	"sharequiz/app"
 	"sync"
 
@@ -52,8 +53,8 @@ func InitPlayerJoinSocket() {
 	defer playerJoinServer.Close()
 
 	http.Handle("/socket.io/join_game/", playerJoinServer)
-	log.Println("Serving at localhost:8081...")
-	log.Fatal(http.ListenAndServe(":8081", nil))
+	log.Println("Serving at localhost" + os.Getenv("PARTNER_PORT"))
+	log.Fatal(http.ListenAndServe(os.Getenv("PARTNER_PORT"), nil))
 }
 
 func connectJoin(conn socketio.Conn, gameData GameData) {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"sharequiz/app"
 	"sharequiz/app/database"
 	"time"
@@ -51,8 +52,8 @@ func InitGameSocket() {
 	defer server.Close()
 
 	http.Handle("/socket.io/", server)
-	log.Println("Serving at localhost:8082...")
-	log.Fatal(http.ListenAndServe(":8082", nil))
+	log.Println("Serving at localhost" + os.Getenv("GAME_PORT"))
+	log.Fatal(http.ListenAndServe(os.Getenv("GAME_PORT"), nil))
 }
 
 func disconnectPlayer(c socketio.Conn) {

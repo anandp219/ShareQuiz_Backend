@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"sharequiz/app"
 	"sharequiz/app/admin"
 	"sharequiz/app/database"
@@ -31,7 +32,7 @@ func main() {
 	database.InitElastic()
 	go socket.InitPlayerJoinSocket()
 	go socket.InitGameSocket()
-	err := router.Run()
+	err := router.Run(os.Getenv("HTTP_PORT"))
 	if err != nil {
 		fmt.Println("Error while starting server")
 	}
