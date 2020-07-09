@@ -2,12 +2,11 @@ package app
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math/rand"
 	"net/http"
-	"regexp"
 	"sharequiz/app/database"
+	"sharequiz/app/thirdparty"
 	"strconv"
 	"time"
 
@@ -28,6 +27,7 @@ type PhoneVerificationData struct {
 func GetOTP(c *gin.Context) {
 	phoneNumber := c.Query("phone_number")
 	err := validatePhoneNumber(phoneNumber)
+	success := false
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"message": "check the phone number",
@@ -58,7 +58,8 @@ func GetOTP(c *gin.Context) {
 			})
 			return
 		}
-		fmt.Println("Otp send for phoneNumber " + phoneNumber + " is : " + otp)
+		fmt.Println("Otp sent for phoneNumber " + phoneNumber + " is : " + otp)
+		success = thirdparty.SendSms(phoneNumber, otp)
 	} else if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"message": "Error while sending OTP.",
@@ -70,6 +71,16 @@ func GetOTP(c *gin.Context) {
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"message": "Error while sending OTP.",
+			})
+			return
+		}
+		if data.IsVerified == true || data.SentTimestamp.After(time.Now().Add(time.Duration(-1)*time.Second)) {
+			errorMessage := "Phone number already in use."
+			if !data.IsVerified {
+				errorMessage = "Please wait sometime before requesting otp again"
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"message": errorMessage,
 			})
 			return
 		}
@@ -96,10 +107,18 @@ func GetOTP(c *gin.Context) {
 			return
 		}
 		fmt.Println("Otp send for phoneNumber " + phoneNumber + " is : " + otp)
+		success = thirdparty.SendSms(phoneNumber, otp)
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"result": "success",
-	})
+	if success {
+		c.JSON(http.StatusOK, gin.H{
+			"result": "success",
+		})
+	} else {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"message": "Error while sending OTP.",
+		})
+		return
+	}
 	return
 }
 
@@ -163,15 +182,15 @@ func VerifyOTP(c *gin.Context) {
 }
 
 func validatePhoneNumber(phoneNumber string) error {
-	numOfDigits := len(phoneNumber)
-	errorString := "phone number wrong"
-	if numOfDigits != 10 {
-		return errors.New(errorString)
-	}
-	re := regexp.MustCompile(`^[1-9]\d{9}$`)
-	if !re.MatchString(phoneNumber) {
-		return errors.New(errorString)
-	}
+	// numOfDigits := len(phoneNumber)
+	// errorString := "phone number wrong"
+	// if numOfDigits != 10 {
+	// 	return errors.New(errorString)
+	// }
+	// re := regexp.MustCompile(`^[1-9]\d{9}$`)
+	// if !re.MatchString(phoneNumber) {
+	// 	return errors.New(errorString)
+	// }
 	return nil
 }
 
