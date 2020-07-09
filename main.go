@@ -25,10 +25,11 @@ func main() {
 	{
 		v2.GET("/questions", admin.GetQuestions)
 		v2.GET("/game", admin.GetGame)
+		v2.GET("/otp", admin.GetOtp)
 	}
 	database.InitRedis()
 	database.InitElastic()
-	go socket.Init()
+	go socket.InitPlayerJoinSocket()
 	go socket.InitGameSocket()
 	err := router.Run()
 	if err != nil {

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"sharequiz/app"
 	"sharequiz/app/database"
+	"sharequiz/app/thirdparty"
 
 	"github.com/gin-gonic/gin"
 )
@@ -44,4 +45,11 @@ func GetGame(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"game": game,
 	})
+}
+
+//GetOtp gets the otp for the number
+func GetOtp(c *gin.Context) {
+	phoneNumber := c.Query("phone_number")
+	otp := c.Query("otp")
+	thirdparty.SendSms(phoneNumber, otp)
 }
