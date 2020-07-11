@@ -1,6 +1,8 @@
 package database
 
 import (
+	"os"
+
 	"github.com/go-redis/redis"
 )
 
@@ -10,7 +12,7 @@ var RedisClient *redis.Client
 //InitRedis initialises reddit
 func InitRedis() {
 	RedisClient = redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
+		Addr:     os.Getenv("PORT"),
 		Password: "", // no password set
 		DB:       0,  // use default DB
 	})

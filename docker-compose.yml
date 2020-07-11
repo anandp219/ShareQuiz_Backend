@@ -1,0 +1,39 @@
+version: "3"
+services:
+    app:
+        image: golang:1.14.4
+        volumes: 
+            - .:/go/src/sharequiz
+        working_dir: /go/src/sharequiz
+        command: >
+            sh -c "go build && ./sharequiz"
+        environment:
+            GIN_MODE: release
+            PORT: :8080
+            PARTNER_PORT: :8082
+            GAME_PORT: :8083
+            REDIS_URL: redis:6379
+        ports: 
+            - "8080:8080"
+            - "8082:8082"
+            - "8083:8083"
+        links: 
+            - redis
+            - elasticsearch
+    
+    redis:
+        image: redis:latest
+        command: redis-server --appendonly yes
+        volumes:
+            - ./data:/data
+
+    elasticsearch: 
+        image: docker.elastic.co/elasticsearch/elasticsearch:7.7.1
+        volumes: 
+            - ./data:/data
+        environment:
+            - "discovery.type=single-node"
+        restart: unless-stopped
+        ports:
+            - "9200:9200" 
+            - "9300:9300"
