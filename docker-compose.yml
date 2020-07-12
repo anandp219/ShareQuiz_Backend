@@ -21,9 +21,6 @@ services:
         links: 
             - redis
             - elasticsearch
-        logging: 
-            driver: gcplogs 
-
     
     redis:
         image: redis:latest
@@ -32,8 +29,6 @@ services:
             - ./data:/data
         ports: 
             - "6379:6379"
-        logging: 
-            driver: gcplogs 
 
     elasticsearch: 
         image: docker.elastic.co/elasticsearch/elasticsearch:7.7.1
@@ -45,5 +40,3 @@ services:
         ports:
             - "9200:9200" 
             - "9300:9300"
-        logging: 
-            driver: gcplogs 
