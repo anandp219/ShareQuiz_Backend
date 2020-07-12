@@ -3,6 +3,7 @@ package app
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"sharequiz/app/database"
 	"strconv"
 	"strings"
@@ -49,6 +50,7 @@ func CreateGame(maxQuestions int, language Language, numberOfPlayers int, topic 
 		if err == redis.Nil {
 			gameID = 1
 		} else if err != nil {
+			log.Println("error while creating game " + err.Error())
 			continue
 		} else {
 			gameID, _ = strconv.Atoi(lastGameID)
@@ -56,6 +58,7 @@ func CreateGame(maxQuestions int, language Language, numberOfPlayers int, topic 
 		}
 
 		questions, err := GetGameQuestions(topic, language, maxQuestions)
+		log.Println("error while creating game 2 " + err.Error())
 		if err != nil {
 			continue
 		}
@@ -73,13 +76,16 @@ func CreateGame(maxQuestions int, language Language, numberOfPlayers int, topic 
 			Scores:           make(map[string][]int),
 		}
 		dataStr, err := json.Marshal(data)
+		log.Println("error while creating game 3 " + err.Error())
 		if err != nil {
 			continue
 		}
 
 		_, err = database.RedisClient.Set(strconv.Itoa(gameID), string(dataStr), 0).Result()
+		log.Println("error while creating game 4 " + err.Error())
 		if err == nil {
 			_, err := database.RedisClient.Set(LastGameIDKey, gameID, 0).Result()
+			log.Println("error while creating game 5 " + err.Error())
 			if err == nil {
 				return strconv.Itoa(gameID), nil
 			}
