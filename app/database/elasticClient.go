@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
+	"os"
 
 	"github.com/elastic/go-elasticsearch/v8"
 )
@@ -15,7 +17,16 @@ var indexName = "questions"
 
 //InitElastic function initialises the
 func InitElastic() {
-	elasticClient, _ = elasticsearch.NewDefaultClient()
+	var err error
+	cfg := elasticsearch.Config{
+		Addresses: []string{
+			os.Getenv("ELASTIC_URL"),
+		},
+	}
+	elasticClient, err = elasticsearch.NewClient(cfg)
+	if err != nil {
+		log.Panicln(err)
+	}
 }
 
 //SearchQuestions is used to search for questions
