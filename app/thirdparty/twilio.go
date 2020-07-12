@@ -9,7 +9,7 @@ import (
 )
 
 var accountSid = "ACa4eb47fd6fe54d2b16b205293a667a16"
-var authToken = "55338c41aab625bebb011a180485eb79"
+var authToken = "5a3da9710cb73aa09a26feb2d08d9420"
 var urlStr = "https://api.twilio.com/2010-04-01/Accounts/" + accountSid + "/Messages.json"
 var twilioPhoneNumber = "+12058962682"
 
