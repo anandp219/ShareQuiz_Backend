@@ -47,6 +47,20 @@ func GetGame(c *gin.Context) {
 	})
 }
 
+//CreateGame creates game for the app
+func CreateGame(c *gin.Context) {
+	gameID, err := app.CreateGame(10, app.Hindi, 2, app.India)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"result": err.Error(),
+		})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"game": gameID,
+	})
+}
+
 //GetOtp gets the otp for the number
 func GetOtp(c *gin.Context) {
 	phoneNumber := c.Query("phone_number")

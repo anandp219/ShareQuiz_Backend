@@ -27,6 +27,7 @@ func main() {
 		v2.GET("/questions", admin.GetQuestions)
 		v2.GET("/game", admin.GetGame)
 		v2.GET("/otp", admin.GetOtp)
+		v2.GET("/create_game", admin.CreateGame)
 	}
 	database.InitRedis()
 	database.InitElastic()
