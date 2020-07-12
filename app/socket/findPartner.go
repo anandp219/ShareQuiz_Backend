@@ -1,6 +1,7 @@
 package socket
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -58,6 +59,7 @@ func InitPlayerJoinSocket() {
 }
 
 func connectJoin(conn socketio.Conn, gameData GameData) {
+	fmt.Println("connectjoin")
 	key := gameData.Topic.String() + "_" + gameData.Language.String()
 	lockTopic(key)
 	SocketToTopicMap[conn.ID()] = key
@@ -69,6 +71,7 @@ func connectJoin(conn socketio.Conn, gameData GameData) {
 		secondConn := socketsForTopic[0]
 		gameID, err := app.CreateGame(app.NumOfQuestionsInGame, gameData.Language, 2, gameData.Topic)
 		if err != nil {
+			fmt.Println("error for game is " + err.Error())
 			panic("Socket Error")
 		}
 		RoomToLock[gameID] = &sync.Mutex{}
