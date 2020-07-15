@@ -32,19 +32,22 @@ func InitGameSocket() {
 		panic(err)
 	}
 	server.OnConnect("/", func(s socketio.Conn) error {
-		log.Println("Connected")
+		log.Println("connect game")
 		return nil
 	})
 
 	server.OnDisconnect("/", func(s socketio.Conn, reason string) {
+		log.Println("disconnect game")
 		go disconnectPlayer(s)
 	})
 
 	server.OnEvent("/", "join", func(c socketio.Conn, room Room) {
+		log.Println("join game")
 		go playerJoin(c, room)
 	})
 
 	server.OnEvent("/", "answer", func(c socketio.Conn, gameString string) {
+		log.Println("answer")
 		go answerQuestion(c, gameString)
 	})
 
