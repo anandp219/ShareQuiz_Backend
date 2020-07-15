@@ -26,14 +26,14 @@ services:
         image: redis:latest
         command: redis-server --appendonly yes
         volumes:
-            - ./data:/data
+            - ~/data/redisdata:/data
         ports: 
             - "6379:6379"
 
     elasticsearch: 
-        image: docker.elastic.co/elasticsearch/elasticsearch:7.7.1
+        image: docker.elastic.co/elasticsearch/elasticsearch:7.8.0
         volumes: 
-            - ./data:/data
+            - ~/data/elasticdata:/usr/share/elasticsearch/data
         environment:
             - "discovery.type=single-node"
         restart: unless-stopped
