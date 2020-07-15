@@ -27,6 +27,7 @@ services:
         command: redis-server --appendonly yes
         volumes:
             - ~/data/redisdata:/data
+        restart: unless-stopped
         ports: 
             - "6379:6379"
 
