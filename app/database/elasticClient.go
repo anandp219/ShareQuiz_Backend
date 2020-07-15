@@ -59,7 +59,6 @@ func SearchQuestions(searchQuery map[string]interface{}) (map[string]interface{}
 	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
 		return nil, err
 	}
-	log.Println(result["hits"].(map[string]interface{}))
 
 	return result["hits"].(map[string]interface{}), nil
 }

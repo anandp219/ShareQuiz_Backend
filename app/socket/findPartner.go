@@ -44,7 +44,6 @@ func InitPlayerJoinSocket() {
 
 	playerJoinServer.OnEvent("/", "join", func(c socketio.Conn, gameData GameData) {
 		log.Println("join")
-		log.Println("join " + gameData.Language.String() + " " + gameData.Topic.String())
 		go connectJoin(c, gameData)
 	})
 
