@@ -43,8 +43,6 @@ const (
 const (
 	//India default topic
 	India Topic = iota + 1
-	//Cinema topic
-	Cinema
 	//Science topic
 	Science
 	//Technology topic
