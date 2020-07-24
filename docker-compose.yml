@@ -8,6 +8,7 @@ services:
         command: >
             sh -c "go build && ./sharequiz"
         environment:
+            ENV: production
             GIN_MODE: release
             PORT: :8080
             PARTNER_PORT: :8082

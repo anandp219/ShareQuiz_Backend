@@ -67,3 +67,8 @@ func GetOtp(c *gin.Context) {
 	otp := c.Query("otp")
 	thirdparty.SendSms(phoneNumber, otp)
 }
+
+//CreateRoom admin API to create room
+func CreateRoom(c *gin.Context) {
+	app.CreateRoom(c)
+}

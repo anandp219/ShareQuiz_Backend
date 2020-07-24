@@ -21,13 +21,16 @@ func main() {
 	{
 		v1.GET("/otp", app.GetOTP)
 		v1.PUT("/otp", app.VerifyOTP)
+		v1.GET("/room", app.CreateRoom)
+		v1.GET("/join_room", app.JoinRoom)
 	}
 	v2 := router.Group("/api/admin")
 	{
-		v2.GET("/questions", admin.GetQuestions)
+		v2.GET("/questions ", admin.GetQuestions)
 		v2.GET("/game", admin.GetGame)
 		v2.GET("/otp", admin.GetOtp)
 		v2.GET("/create_game", admin.CreateGame)
+		v2.GET("/room", admin.CreateRoom)
 	}
 	database.InitRedis()
 	database.InitElastic()

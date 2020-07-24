@@ -12,6 +12,8 @@ type Status int
 const (
 	//LastGameIDKey used for the game
 	LastGameIDKey = "last_game_id_key"
+	//LastRoomIDKey used for the room
+	LastRoomIDKey = "last_room_id_key"
 	//NumOfQuestionsInGame number of questions in a game
 	NumOfQuestionsInGame = 10
 )
@@ -41,8 +43,8 @@ const (
 const (
 	//India default topic
 	India Topic = iota + 1
-	//Bollywood topic
-	Bollywood
+	//Cinema topic
+	Cinema
 	//Science topic
 	Science
 	//Technology topic
@@ -56,7 +58,7 @@ func (l Language) String() string {
 }
 
 func (t Topic) String() string {
-	return []string{"Default", "India", "Bollywood", "Science", "Technology", "World"}[t]
+	return []string{"Default", "India", "Cinema", "Science", "Technology", "World"}[t]
 }
 
 func (s Status) String() string {

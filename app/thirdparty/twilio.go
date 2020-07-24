@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 )
 
@@ -15,6 +16,9 @@ var twilioPhoneNumber = "+12058962682"
 
 // SendSms sends the sms for OTP verification
 func SendSms(phoneNumber string, otp string) bool {
+	if os.Getenv("ENV") == "local" {
+		return true
+	}
 	msgData := url.Values{}
 	msgData.Set("To", phoneNumber)
 	msgData.Set("From", twilioPhoneNumber)

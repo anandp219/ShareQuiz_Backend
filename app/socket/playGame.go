@@ -191,7 +191,7 @@ func sendNewQuestion(game *app.Game, shouldLockRoom bool, c socketio.Conn) {
 			event = "game_over"
 		} else {
 			game.QuestionNumber++
-			time.Sleep(5 * time.Second)
+			time.Sleep(2 * time.Second)
 		}
 		gameJSON, err := json.Marshal(game)
 		if err != nil {
