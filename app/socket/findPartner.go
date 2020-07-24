@@ -19,6 +19,13 @@ type GameData struct {
 	Language app.Language `json:"language,string"`
 }
 
+// GameRoom Initial game data of the game
+type GameRoom struct {
+	Topic    app.Topic    `json:"topic,string"`
+	Language app.Language `json:"language,string"`
+	RoomID   string       `json:"roomID"`
+}
+
 // WaitingSockets variable is used for connection.
 var WaitingSockets = make(map[string][]socketio.Conn)
 
@@ -43,8 +50,13 @@ func InitPlayerJoinSocket() {
 	})
 
 	playerJoinServer.OnEvent("/", "join", func(c socketio.Conn, gameData GameData) {
-		log.Println("join")
-		go connectJoin(c, gameData)
+		log.Println("join without room")
+		go connectJoinWithoutRoom(c, gameData)
+	})
+
+	playerJoinServer.OnEvent("/", "join_with_room", func(c socketio.Conn, gameData GameRoom) {
+		log.Println("join with room")
+		go connectJoinWithRoom(c, gameData)
 	})
 
 	playerJoinServer.OnDisconnect("/", func(s socketio.Conn, reason string) {
@@ -60,10 +72,24 @@ func InitPlayerJoinSocket() {
 	log.Fatal(http.ListenAndServe(os.Getenv("PARTNER_PORT"), nil))
 }
 
-func connectJoin(conn socketio.Conn, gameData GameData) {
-	fmt.Println("connectjoin")
+func connectJoinWithoutRoom(conn socketio.Conn, gameData GameData) {
+	fmt.Println("connectjoin without Room")
 	key := gameData.Topic.String() + "_" + gameData.Language.String()
 	lockTopic(key)
+	connectJoin(conn, key, gameData.Language, gameData.Topic)
+	unlockTopic(key)
+
+}
+
+func connectJoinWithRoom(conn socketio.Conn, gameData GameRoom) {
+	fmt.Println("connectjoin with Room")
+	key := gameData.Topic.String() + "_" + gameData.Language.String() + "_" + gameData.RoomID
+	lockTopic(key)
+	connectJoin(conn, key, gameData.Language, gameData.Topic)
+	unlockTopic(key)
+}
+
+func connectJoin(conn socketio.Conn, key string, language app.Language, topic app.Topic) {
 	SocketToTopicMap[conn.ID()] = key
 	defer handleConnectJoinError(conn, key)
 	if len(WaitingSockets[key]) == 0 {
@@ -71,7 +97,7 @@ func connectJoin(conn socketio.Conn, gameData GameData) {
 	} else {
 		socketsForTopic := WaitingSockets[key]
 		secondConn := socketsForTopic[0]
-		gameID, err := app.CreateGame(app.NumOfQuestionsInGame, gameData.Language, 2, gameData.Topic)
+		gameID, err := app.CreateGame(app.NumOfQuestionsInGame, language, 2, topic)
 		if err != nil {
 			fmt.Println("error for game is " + err.Error())
 			panic("Socket Error")
@@ -80,8 +106,10 @@ func connectJoin(conn socketio.Conn, gameData GameData) {
 		conn.Emit("game", gameID)
 		secondConn.Emit("game", gameID)
 		WaitingSockets[key] = socketsForTopic[1:]
+		if len(WaitingSockets[key]) == 0 {
+			delete(WaitingSockets, key)
+		}
 	}
-	unlockTopic(key)
 }
 
 func disconnectJoin(conn socketio.Conn) {
@@ -99,6 +127,9 @@ func disconnectJoin(conn socketio.Conn) {
 				WaitingSockets[key] = append(socketsForTopic[:i], socketsForTopic[i+1:]...)
 			}
 		}
+	}
+	if len(WaitingSockets[key]) == 0 {
+		delete(WaitingSockets, key)
 	}
 	unlockTopic(key)
 }

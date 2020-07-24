@@ -26,7 +26,7 @@ type PhoneVerificationData struct {
 // GetOTP GetOTP
 func GetOTP(c *gin.Context) {
 	phoneNumber := c.Query("phone_number")
-	err := validatePhoneNumber(phoneNumber)
+	err := ValidatePhoneNumber(phoneNumber)
 	success := false
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -126,12 +126,13 @@ func GetOTP(c *gin.Context) {
 func VerifyOTP(c *gin.Context) {
 	phoneNumber := c.Query("phone_number")
 	otp := c.Query("otp")
-	err := validatePhoneNumber(phoneNumber)
+	err := ValidatePhoneNumber(phoneNumber)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"message": "Error while verifying OTP.",
 		})
 		return
+
 	}
 	val, err := database.RedisClient.Get(phoneNumber).Result()
 	if err != nil {
@@ -181,7 +182,8 @@ func VerifyOTP(c *gin.Context) {
 	}
 }
 
-func validatePhoneNumber(phoneNumber string) error {
+//ValidatePhoneNumber validate the phone number
+func ValidatePhoneNumber(phoneNumber string) error {
 	// numOfDigits := len(phoneNumber)
 	// errorString := "phone number wrong"
 	// if numOfDigits != 10 {
