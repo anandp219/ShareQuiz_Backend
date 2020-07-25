@@ -52,7 +52,7 @@ func CreateGame(c *gin.Context) {
 	gameID, err := app.CreateGame(10, app.Hindi, 2, app.India)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"result": err.Error(),
+			"result": "error",
 		})
 		return
 	}

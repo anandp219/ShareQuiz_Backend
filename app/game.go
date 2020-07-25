@@ -50,7 +50,7 @@ func CreateGame(maxQuestions int, language Language, numberOfPlayers int, topic 
 		if err == redis.Nil {
 			gameID = 1
 		} else if err != nil {
-			log.Println("error while creating game " + err.Error())
+			log.Println("error while creating game ")
 			continue
 		} else {
 			gameID, _ = strconv.Atoi(lastGameID)
@@ -59,7 +59,7 @@ func CreateGame(maxQuestions int, language Language, numberOfPlayers int, topic 
 
 		questions, err := GetGameQuestions(topic, language, maxQuestions)
 		if err != nil {
-			log.Println("error while creating game " + err.Error())
+			log.Println("error while creating game ")
 			continue
 		}
 
@@ -77,7 +77,7 @@ func CreateGame(maxQuestions int, language Language, numberOfPlayers int, topic 
 		}
 		dataStr, err := json.Marshal(data)
 		if err != nil {
-			log.Println("error while creating game 3 " + err.Error())
+			log.Println("error while creating game 3 ")
 			continue
 		}
 

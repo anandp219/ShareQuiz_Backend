@@ -38,7 +38,7 @@ func CreateRoom(c *gin.Context) {
 	if err == redis.Nil {
 		roomID = 1
 	} else if err != nil {
-		sendError(c, "error while creating game "+err.Error())
+		sendError(c, "error while creating game ")
 		return
 	} else {
 		roomID, _ = strconv.Atoi(lastRoomID)
@@ -82,19 +82,19 @@ func JoinRoom(c *gin.Context) {
 	fmt.Println("joining room " + roomID + " for the phone number " + phoneNumber)
 	savedRoomData, err := database.RedisClient.Get("room-" + roomID).Result()
 	if err != nil {
-		sendError(c, "error while joining game "+err.Error())
+		sendError(c, "error while joining game ")
 		return
 	}
 	savedGameRoom := GameRoom{}
 	err = json.Unmarshal([]byte(savedRoomData), &savedGameRoom)
 	if err != nil {
-		sendError(c, "error while joining game "+err.Error())
+		sendError(c, "error while joining game ")
 		return
 	}
 
 	if savedGameRoom.Language != gameRoom.Language ||
 		savedGameRoom.Topic != gameRoom.Topic {
-		sendError(c, "the topic and language should be exact for game "+err.Error())
+		sendError(c, "the topic and language should be exact for game ")
 		return
 	}
 	sendSuccess(c, roomID)

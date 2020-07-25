@@ -56,7 +56,7 @@ func (l Language) String() string {
 }
 
 func (t Topic) String() string {
-	return []string{"Default", "India", "Cinema", "Science", "Technology", "World"}[t]
+	return []string{"Default", "India", "Science", "Technology", "World"}[t]
 }
 
 func (s Status) String() string {

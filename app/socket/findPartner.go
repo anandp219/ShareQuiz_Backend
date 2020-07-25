@@ -99,7 +99,7 @@ func connectJoin(conn socketio.Conn, key string, language app.Language, topic ap
 		secondConn := socketsForTopic[0]
 		gameID, err := app.CreateGame(app.NumOfQuestionsInGame, language, 2, topic)
 		if err != nil {
-			fmt.Println("error for game is " + err.Error())
+			fmt.Println("error for game is ")
 			panic("Socket Error")
 		}
 		RoomToLock[gameID] = &sync.Mutex{}
