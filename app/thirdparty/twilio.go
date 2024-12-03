@@ -9,10 +9,10 @@ import (
 	"strings"
 )
 
-var accountSid = "ACa4eb47fd6fe54d2b16b205293a667a16"
-var authToken = "89320f60f14b11eb7f2494ff3e5a009d"
+var accountSid = ""
+var authToken = ""
 var urlStr = "https://api.twilio.com/2010-04-01/Accounts/" + accountSid + "/Messages.json"
-var twilioPhoneNumber = "+12058962682"
+var twilioPhoneNumber = ""
 
 // SendSms sends the sms for OTP verification
 func SendSms(phoneNumber string, otp string) bool {
